@@ -11,8 +11,9 @@ String nome_ssid = WIFI_ssid;
 
 /* -------- Configurações de relógio on-line----------- */
 WiFiUDP udp;        
-char* _serverP = "pool.ntp.org?";             //NTP GLOBAL      //SERVIDOR NTP PRINCIPAL
-char* _serverB = "gps.ntp.br?";               //NTP BR          //SERVIDOR NTP SECUNDARIO
+const char* _serverP = "pool.ntp.org?";             //NTP GLOBAL      //SERVIDOR NTP PRINCIPAL
+const char* _serverB = "gps.ntp.br?";               //NTP BR          //SERVIDOR NTP SECUNDARIO
+const char* _serverP2 = "189.45.192.3";             //PARA TESTES DE DECINCRONISMO
 
 /*OUTROS SERVIDORES*/
 //const char* _serverP = "189.45.192.3";           //NTP Unifique   
@@ -27,11 +28,12 @@ char data_formatada[64];                          //PARA MANIPUNAR A TIMESTAMP I
 time_t _time_stamp;
 NTPClient ntp_P(udp, _serverP, -3 * 3600, 60000); //SETA UM OBJETO COM AS CONFIGURAÇÕES DO SERVER PRINCIPAL
 NTPClient ntp_B(udp, _serverB, -3 * 3600, 60000); //SETA O SEGUNDO OBJETO COM AS CONF DO SERVER DE BACKUP
+NTPClient ntp_P2(udp,_serverP2, -3 * 3600, 60000); //SETA UM OBJETO COM AS CONFIGURAÇÕES DO SERVER PRINCIPAL
 
 struct tm data; //Cria a estrutura que contem as informacoes da data.
 
 void setup()
-{
+{  
   Serial.begin(9600);
   Serial.print("Start...Iniciado Serial a 9600...Iniciando tentativas de conexão WIFI SSID:");
   Serial.write(WIFI_ssid);
@@ -66,11 +68,12 @@ void loop()
                 
                 _time_stamp = time(NULL);  //Obtem o tempo atual em segundos. Utilize isso sempre que precisar obter o tempo atual
                 data = *gmtime(&_time_stamp);     //Converte o tempo atual e atribui na estrutura
-                if (data.tm_sec == 50){  //NO SEGUNDO 50 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
+                if (data.tm_sec == 30){  //NO SEGUNDO 50 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
                     Tempos();                                 
                 }
-                if (data.tm_min == 2){  //NO SEGUNDO 50 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
-                    _serverP = "pool.ntp.org";                                 
+                if ((data.tm_min ==  1)&&(data.tm_sec == 2)){                                         
+                    Serial.println("Corrigido server p para 189...");
+                    conexao_NTP("_serverP2");                    
                 }
                 strftime(data_formatada, 64, "%d/%m/%Y", &data);   //strftime(data_formatada, 64, "%d/%m/%Y %H:%M:%S", &data);   //Cria uma String formatada da estrutura "data" //Cria uma String formatada da estrutura "data"
                 strftime(hora_formatada, 64, "%H:%M:%S", &data);   //Cria uma String formatada da estrutura "data"                
@@ -162,7 +165,24 @@ bool conexao_NTP(String S){
             return true;          
           }
         }else{
-           //
+           if (S == "_serverP2"){
+                                  ntp_P2.begin(); 
+                                  if ( !ntp_P2.forceUpdate()) {  /*Tentetivas de conexão NTP */
+                                    //Serial.print("Server NTP Principal Falhou!" );
+                                    return false;            
+                                  }else{
+                                    //Serial.println("Obtido dados do Server Principal NTP com Sucesso!");
+                                    ntp_P2.forceUpdate();
+                                    hora = ntp_P2.getFormattedTime();/* Armazena na variável hora, o horário atual. */
+                                    
+                                      timeval tv;                //Cria a estrutura temporaria para funcao abaixo.  
+                                      tv.tv_sec = ntp_P2.getEpochTime();     //Atribui minha data atual. Voce pode usar o NTP para isso ou o site citado no artigo! // 12:00 08/08/1982
+                                      settimeofday(&tv, NULL);   //Configura o RTC para manter a data atribuida atualizada.
+                                                    
+                                    _server_ativo = S;
+                                    return true;          
+                                  }
+           }           
         }
       }
  }
