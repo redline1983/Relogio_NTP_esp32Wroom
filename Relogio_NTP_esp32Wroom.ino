@@ -23,7 +23,6 @@ String hora = "Ainda Desconhecida";               //ARMAZENA A HORA CERTA ATUALI
 String _timestamp_S_NTP = "Ainda desconhecido";
 char hora_formatada[64];                          //PARA MANIPUNAR A TIMESTAMP INTERNO DO MICROCONTROLADOR
 char data_formatada[64];                          //PARA MANIPUNAR A TIMESTAMP INTERNO DO MICROCONTROLADOR
-
 NTPClient ntp_P(udp, _serverP, -3 * 3600, 60000); //SETA UM OBJETO COM AS CONFIGURAÇÕES DO SERVER PRINCIPAL
 NTPClient ntp_B(udp, _serverB, -3 * 3600, 60000); //SETA O SEGUNDO OBJETO COM AS CONF DO SERVER DE BACKUP
 
@@ -42,7 +41,7 @@ void setup()
    /* Espera a conexão. */
       while ( WiFi.status() != WL_CONNECTED ) {
         delay ( 500 );
-        Serial.print ( " ... (((o))) <>" );
+        Serial.print ( " ... (((o))) ..." );
       }
   Serial.println();    
   Serial.println("WIFI Conectado com Sucesso!");
@@ -52,7 +51,7 @@ void setup()
       
 }
 void loop()
-{
+{  
                 if (_server_ativo == _serverP){
                   hora = ntp_P.getFormattedTime();        /* PEGA A HORA DO SERVER NTP */
                   _timestamp_S_NTP = ntp_P.getEpochTime();/* PEGA A TIMESTAMP DO SERVER NTP */
@@ -64,9 +63,13 @@ void loop()
                 }
                 
                 time_t tt = time(NULL);  //Obtem o tempo atual em segundos. Utilize isso sempre que precisar obter o tempo atual
-                data = *gmtime(&tt);     //Converte o tempo atual e atribui na estrutura                                   
+                data = *gmtime(&tt);     //Converte o tempo atual e atribui na estrutura
+                if (data.tm_sec == 50){  //NO SEGUNDO 50 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
+                    Tempos();                                 
+                }
                 strftime(data_formatada, 64, "%d/%m/%Y", &data);   //strftime(data_formatada, 64, "%d/%m/%Y %H:%M:%S", &data);   //Cria uma String formatada da estrutura "data" //Cria uma String formatada da estrutura "data"
-                strftime(hora_formatada, 64, "%H:%M:%S", &data);   //Cria uma String formatada da estrutura "data"
+                strftime(hora_formatada, 64, "%H:%M:%S", &data);   //Cria uma String formatada da estrutura "data"                
+                
 
   if (_server_ativo.indexOf("Falha!")==0){                   
           Serial.print("Hora: ");
@@ -87,10 +90,33 @@ void loop()
           Serial.print(" "+ String(_server_ativo));     /* Escreve a hora no monitor serial. */
           Serial.print(" <Hora nele:> ");        
           Serial.print(hora);
-                        
-          Serial.println();
-          delay(1000);   /* Espera 1 segundo. */        
+          Serial.print(" <timestamp NTP:> ");        
+          Serial.print(_timestamp_S_NTP);
+          Serial.print(" <timestamp ESP:> ");        
+          Serial.print(tt);
+          
+          Serial.print(" <NTP - ESP:> ");
+          if ((tt-(_timestamp_S_NTP.toInt ()) <= -10 )||(tt-(_timestamp_S_NTP.toInt ()) >= 10 )){
+            Serial.print(tt-(_timestamp_S_NTP.toInt ()));
+            Serial.print(" <<< DECINCRONISMO DETECTADO! ");
+            Serial.println();            
+            delay(1000);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
+            verifica_atualiza_NTP();               
+          }else{
+            Serial.print(tt-(_timestamp_S_NTP.toInt ())); 
+            Serial.println();
+            delay(1000);   /* Espera 1 segundo. */                                 
+          }                                     
   }
+}
+void Tempos(){
+    if ((tt-(_timestamp_S_NTP.toInt ()) <= -60 )||(tt-(_timestamp_S_NTP.toInt ()) >= 60 )){
+      Serial.println("Sincronizando com servidore NTP...");        
+      delay(1000);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
+      verifica_atualiza_NTP();               
+    }else{
+       //                               
+    }     
 }
 
 bool conexao_NTP(String S){   
