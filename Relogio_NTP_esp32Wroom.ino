@@ -23,6 +23,8 @@ String hora = "Ainda Desconhecida";               //ARMAZENA A HORA CERTA ATUALI
 String _timestamp_S_NTP = "Ainda desconhecido";
 char hora_formatada[64];                          //PARA MANIPUNAR A TIMESTAMP INTERNO DO MICROCONTROLADOR
 char data_formatada[64];                          //PARA MANIPUNAR A TIMESTAMP INTERNO DO MICROCONTROLADOR
+
+time_t _time_stamp;
 NTPClient ntp_P(udp, _serverP, -3 * 3600, 60000); //SETA UM OBJETO COM AS CONFIGURAÇÕES DO SERVER PRINCIPAL
 NTPClient ntp_B(udp, _serverB, -3 * 3600, 60000); //SETA O SEGUNDO OBJETO COM AS CONF DO SERVER DE BACKUP
 
@@ -62,8 +64,8 @@ void loop()
                   //Serial.println("_serverB");
                 }
                 
-                time_t tt = time(NULL);  //Obtem o tempo atual em segundos. Utilize isso sempre que precisar obter o tempo atual
-                data = *gmtime(&tt);     //Converte o tempo atual e atribui na estrutura
+                _time_stamp = time(NULL);  //Obtem o tempo atual em segundos. Utilize isso sempre que precisar obter o tempo atual
+                data = *gmtime(&_time_stamp);     //Converte o tempo atual e atribui na estrutura
                 if (data.tm_sec == 50){  //NO SEGUNDO 50 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
                     Tempos();                                 
                 }
@@ -93,24 +95,24 @@ void loop()
           Serial.print(" <timestamp NTP:> ");        
           Serial.print(_timestamp_S_NTP);
           Serial.print(" <timestamp ESP:> ");        
-          Serial.print(tt);
+          Serial.print(_time_stamp);
           
           Serial.print(" <NTP - ESP:> ");
-          if ((tt-(_timestamp_S_NTP.toInt ()) <= -10 )||(tt-(_timestamp_S_NTP.toInt ()) >= 10 )){
-            Serial.print(tt-(_timestamp_S_NTP.toInt ()));
+          if ((_time_stamp -(_timestamp_S_NTP.toInt ()) <= -10 )||(_time_stamp - (_timestamp_S_NTP.toInt ()) >= 10 )){
+            Serial.print(_time_stamp - (_timestamp_S_NTP.toInt ()));
             Serial.print(" <<< DECINCRONISMO DETECTADO! ");
             Serial.println();            
             delay(1000);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
             verifica_atualiza_NTP();               
           }else{
-            Serial.print(tt-(_timestamp_S_NTP.toInt ())); 
+            Serial.print(_time_stamp - (_timestamp_S_NTP.toInt ())); 
             Serial.println();
             delay(1000);   /* Espera 1 segundo. */                                 
           }                                     
   }
 }
 void Tempos(){
-    if ((tt-(_timestamp_S_NTP.toInt ()) <= -60 )||(tt-(_timestamp_S_NTP.toInt ()) >= 60 )){
+    if ((_time_stamp - (_timestamp_S_NTP.toInt ()) <= -60 )||(_time_stamp - (_timestamp_S_NTP.toInt ()) >= 60 )){
       Serial.println("Sincronizando com servidore NTP...");        
       delay(1000);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
       verifica_atualiza_NTP();               
