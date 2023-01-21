@@ -11,14 +11,14 @@ String nome_ssid = WIFI_ssid;
 
 /* -------- Configurações de relógio on-line----------- */
 WiFiUDP udp;        
-const char* _serverP = "pool.ntp.org";             //NTP GLOBAL      //SERVIDOR NTP PRINCIPAL
-const char* _serverB = "gps.ntp.br";               //NTP BR          //SERVIDOR NTP SECUNDARIO
+char* _serverP = "pool.ntp.org?";             //NTP GLOBAL      //SERVIDOR NTP PRINCIPAL
+char* _serverB = "gps.ntp.br?";               //NTP BR          //SERVIDOR NTP SECUNDARIO
 
 /*OUTROS SERVIDORES*/
 //const char* _serverP = "189.45.192.3";           //NTP Unifique   
 //const char* _serverB = "0.br.pool.ntp.org";      //NTP GLOBAL      
 
-String _server_ativo = "Desconhecido!";           //ARMAZENA O ESTADO DO SERVIDOR PARA FUTURAS BUSCAS DE HORARIO ATUALIZADO E ATUALIZAÇOES
+String _server_ativo = "erro Desconhecido nos Servidores NTP!";           //ARMAZENA O ESTADO DO SERVIDOR PARA FUTURAS BUSCAS DE HORARIO ATUALIZADO E ATUALIZAÇOES
 String hora = "Ainda Desconhecida";               //ARMAZENA A HORA CERTA ATUALIZADA OU DO SISTEMA
 String _timestamp_S_NTP = "Ainda desconhecido";
 char hora_formatada[64];                          //PARA MANIPUNAR A TIMESTAMP INTERNO DO MICROCONTROLADOR
@@ -68,6 +68,9 @@ void loop()
                 data = *gmtime(&_time_stamp);     //Converte o tempo atual e atribui na estrutura
                 if (data.tm_sec == 50){  //NO SEGUNDO 50 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
                     Tempos();                                 
+                }
+                if (data.tm_min == 2){  //NO SEGUNDO 50 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
+                    _serverP = "pool.ntp.org";                                 
                 }
                 strftime(data_formatada, 64, "%d/%m/%Y", &data);   //strftime(data_formatada, 64, "%d/%m/%Y %H:%M:%S", &data);   //Cria uma String formatada da estrutura "data" //Cria uma String formatada da estrutura "data"
                 strftime(hora_formatada, 64, "%H:%M:%S", &data);   //Cria uma String formatada da estrutura "data"                
@@ -144,7 +147,7 @@ bool conexao_NTP(String S){
           ntp_B.begin(); 
           if ( !ntp_B.forceUpdate()) {  /*Tentetivas de conexão NTP */
             //Serial.print("Server NTP Principal Falhou!" );
-            _server_ativo = "Falha! dados não obtidos! Servidores NTP offline";
+            //_server_ativo = "Falha! dados não obtidos! Servidores NTP offline";
             return false;            
           }else{
             //Serial.println("Obtido dados do Server Principal NTP com Sucesso!");
@@ -153,7 +156,7 @@ bool conexao_NTP(String S){
 
                timeval tv;                //Cria a estrutura temporaria para funcao abaixo.  
                tv.tv_sec = ntp_B.getEpochTime();     //Atribui minha data atual. Voce pode usar o NTP para isso ou o site citado no artigo! // 12:00 08/08/1982
-               settimeofday(&tv, NULL);   //Configura o RTC para manter a data atribuida atualizada.
+               settimeofday(&tv, NULL);   //Configura o RTC para manter a data atribuida atualizada.               
                
             _server_ativo = _serverB;
             return true;          
@@ -175,10 +178,12 @@ void verifica_atualiza_NTP(){
           }else{
              Serial.println("Server NTP BACKUP  |"+String(_serverB)+"| Falhou!" );
              Serial.println("Sem hora atualizada no momento! nova tentativa em 1 minuto..." ); 
-             
-              timeval tv;                //Cria a estrutura temporaria para funcao abaixo.  
-              tv.tv_sec = 397656000;     //Atribui minha data atual. Voce pode usar o NTP para isso ou o site citado no artigo! // 12:00 08/08/1982
-              settimeofday(&tv, NULL);   //Configura o RTC para manter a data atribuida atualizada.               
+             if( _server_ativo == "erro Desconhecido nos Servidores NTP!"){
+                _server_ativo = "Falha! dados não obtidos! Servidores NTP offline";
+                timeval tv;                //Cria a estrutura temporaria para funcao abaixo.  
+                tv.tv_sec = 397656000;     //Atribui minha data atual. Voce pode usar o NTP para isso ou o site citado no artigo! // 12:00 08/08/1982
+                settimeofday(&tv, NULL);   //Configura o RTC para manter a data atribuida atualizada.               
+             }
           }     
       }
   }
@@ -211,6 +216,19 @@ void verifica_atualiza_NTP(){
     {
       printf("Acionando carga durante 3 segundos...\n");
     }
-  }
+  } 
   */
 //}
+          /*
+           struct tm {
+             int tm_sec;         // seconds,  range 0 to 59        
+             int tm_min;         // minutes, range 0 to 59           
+             int tm_hour;        // hours, range 0 to 23             
+             int tm_mday;        // day of the month, range 1 to 31  
+             int tm_mon;         // month, range 0 to 11             
+             int tm_year;        // The number of years since 1900   
+             int tm_wday;        // day of the week, range 0 to 6    
+             int tm_yday;        // day in the year, range 0 to 365  
+             int tm_isdst;       // daylight saving time             
+          };
+          */
