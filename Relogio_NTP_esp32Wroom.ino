@@ -11,7 +11,7 @@ String nome_ssid = WIFI_ssid;
 
 /* -------- Configurações de relógio on-line----------- */
 WiFiUDP udp;        
-const char* _serverP = "pool.ntp.org???";                          //NTP GLOBAL      //SERVIDOR NTP PRINCIPAL
+const char* _serverP = "pool.ntp.org";                          //NTP GLOBAL      //SERVIDOR NTP PRINCIPAL
 const char* _serverB = "gps.ntp.br";                            //NTP BR          //SERVIDOR NTP SECUNDARIO
 const char* _serverP2 = "189.45.192.3";                         //PARA TESTES DE DECINCRONISMO //ACABOU FICANADO NO CODIGO! //SERVER PROVEDOR UNIFIQUE
 
@@ -21,9 +21,13 @@ const char* _serverP2 = "189.45.192.3";                         //PARA TESTES DE
 
 String _server_ativo = "erro Desconhecido nos Servidores NTP!"; //ARMAZENA O ESTADO DO SERVIDOR PARA FUTURAS BUSCAS DE HORARIO ATUALIZADO E ATUALIZAÇOES
 String hora = "Ainda Desconhecida";                             //ARMAZENA A HORA CERTA ATUALIZADA OU DO SISTEMA PARA FINS DE IMPRESSAO E CONTROLE
-String _timestamp_S_NTP = "Ainda desconhecido";                 //ARMAZENA O TIMESTAMP CERTO ATUALIZADO OU DO NTP PARA FINS DE IMPRESSAO E CONTROLE   
+String _timestamp_S_NTP = "Ainda desconhecido";                 //ARMAZENA O TIMESTAMP CERTO ATUALIZADO OU DO NTP PARA FINS DE IMPRESSAO E CONTROLE 
+long _time_stamp_CTR = 1;
+long _time_stamp_60s = -1;  
 char hora_formatada[64];                                        //PARA MANIPUNAR A HORA TIMESTAMP INTERNA DO MICROCONTROLADOR
 char data_formatada[64];                                        //PARA MANIPUNAR A DATA TIMESTAMP INTERNA DO MICROCONTROLADOR
+boolean conexao_web_ntp = false;                                //SETA ESTADO DA CONEXAO COM O SERVER NTP O QUE VALIDA TAMBEM A CONEXAO COM A INTERNET
+boolean _assincronia_NTP = false;                               //SETA ESTADO DO SINCRONISMO PARA QUE FAÇA TENTATIVA DE SINCRONIA A CADA MINUTO
 
 time_t _time_stamp;
 NTPClient  ntp_P(udp, _serverP, -3 * 3600, 60000);  //SETA UM OBJETO COM AS CONFIGURAÇÕES DO SERVER PRINCIPAL
@@ -61,30 +65,51 @@ void setup()
 }
                 void temos_conexao(char* _ntp_){
                     if (_ntp_ == "ntp_P"){
-                      if (ntp_P.forceUpdate()) {                       
+                      ntp_P.begin(); 
+                      if (ntp_P.forceUpdate()) { 
+                        if (conexao_web_ntp == false){
+                           _assincronia_NTP = true;
+                           Tempos_de_sincronismo_NTP();
+                           _server_ativo = _serverP;                      
+                        }
                         hora = ntp_P.getFormattedTime();        /* PEGA A HORA DO SERVER NTP */
                         _timestamp_S_NTP = ntp_P.getEpochTime();/* PEGA A TIMESTAMP DO SERVER NTP */       
                       }else{
                          //ATRIBUIR ERRO DE WEB AQUI
-                         Serial.print("|NTP offline| "); //Serial.print("|NTP offline: "+String(_serverP)+"|");
+                         Serial.print("|NTP OFFLINE| "); //Serial.print("|NTP offline: "+String(_serverP)+"|");
+                         conexao_web_ntp = false;
                       }
                     }else{
                       if (_ntp_ == "ntp_B"){
+                        ntp_B.begin(); 
                         if (ntp_B.forceUpdate()) {
+                            if (conexao_web_ntp == false){
+                              _assincronia_NTP = true;
+                               Tempos_de_sincronismo_NTP();
+                               _server_ativo = _serverB;                      
+                            }
                            hora = ntp_B.getFormattedTime();        /* PEGA A HORA DO SERVER NTP */
                            _timestamp_S_NTP = ntp_B.getEpochTime();/* PEGA A TIMESTAMP DO SERVER NTP */     
                         }else{
                            //ATRIBUIR ERRO DE WEB AQUI
-                           Serial.print("|NTP offline| "); //Serial.print("|NTP offline: "+String(_serverB)+"|");
+                           Serial.print("|NTP OFFLINE| "); //Serial.print("|NTP offline: "+String(_serverB)+"|");
+                           conexao_web_ntp = false;
                         }
                       }else{
                         if (_ntp_ == "ntp_P2"){
+                          ntp_P2.begin(); 
                           if (ntp_P2.forceUpdate()) {
+                             if (conexao_web_ntp == false){
+                                _assincronia_NTP = true;
+                                Tempos_de_sincronismo_NTP();
+                                _server_ativo = _serverP2;                      
+                             }
                              hora = ntp_P2.getFormattedTime();        /* PEGA A HORA DO SERVER NTP */
                              _timestamp_S_NTP = ntp_P2.getEpochTime();/* PEGA A TIMESTAMP DO SERVER NTP */    
                           }else{
                              //ATRIBUIR ERRO DE WEB AQUI
-                             Serial.print("|NTP offline| "); //Serial.print("|NTP offline: "+String(_serverP2)+"|");
+                             Serial.print("|NTP OFFLINE| "); //Serial.print("|NTP offline: "+String(_serverP2)+"|");
+                             conexao_web_ntp = false;
                           }
                         }
                       }
@@ -105,11 +130,28 @@ void loop()
                 }                
                 
                 _time_stamp = time(NULL);    //Obtem o tempo atual em segundos. Utilize isso sempre que precisar obter o tempo atual
+                if (_time_stamp_CTR != _time_stamp){
+                  if (_time_stamp_60s == -1){
+                     _time_stamp_60s++;                 
+                  }else{
+                      _time_stamp_60s = _time_stamp_60s + (_time_stamp - _time_stamp_CTR);
+                  }
+                  if (_time_stamp_60s >= 61){
+                    Serial.print(" |60S...CORRIDOS| ");
+                    _assincronia_NTP = true; // libera o sincronismo com o NTP
+                    Tempos_de_sincronismo_NTP();
+                    _time_stamp_60s = 1;
+                  }
+                  _time_stamp_CTR = _time_stamp;
+                  Serial.print(" |-t:");
+                  Serial.print(String(_time_stamp_60s));
+                  Serial.print("| ");
+                }
                 data = *gmtime(&_time_stamp);//Converte o tempo atual e atribui na estrutura
                 if (data.tm_sec == 30){      //NO SEGUNDO 50 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
-                    Tempos();                                 
-                }
-                if ((data.tm_min ==  5)&&(data.tm_sec == 1)){                                         
+                    //                              
+                }                
+                if ((data.tm_min ==  2)&&(data.tm_sec == 1)){                                         
                     Serial.println("TENTATIVA DE SINCRONISMO 189...");
                     //conexao_NTP("_serverP2");
                     _server_ativo = _serverP2;                    
@@ -148,23 +190,30 @@ void loop()
             Serial.print("|");
             Serial.print("< Alerta! |ASSINCRONIA| ");
             Serial.println();            
-            delay(1000);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
-            verifica_atualiza_NTP();               
+            delay(1000);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA                                  
           }else{
             Serial.print(_time_stamp - (_timestamp_S_NTP.toInt ())); 
             Serial.println("|");
             delay(1000);   /* Espera 1 segundo. */                                 
           }                                     
   }
+  
 }
-void Tempos(){
+void Tempos_de_sincronismo_NTP(){
+  if ( WiFi.status() != WL_CONNECTED ) {
+       tentativa_conectar_WIFI();        
+  }else{
     if ((_time_stamp - (_timestamp_S_NTP.toInt ()) <= -60 )||(_time_stamp - (_timestamp_S_NTP.toInt ()) >= 60 )){
-      Serial.println("Sincronizando com servidor NTP...");        
-      delay(1000);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
-      verifica_atualiza_NTP();               
+      if (_assincronia_NTP == true){
+          Serial.println("Sincronizando com servidor NTP...");        
+          delay(100);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
+          verifica_atualiza_NTP();
+          _assincronia_NTP = false;
+      }               
     }else{
-       //                               
-    }     
+      //                                   
+    } 
+  }    
 }
 
 bool conexao_NTP(String S){   
@@ -174,7 +223,7 @@ bool conexao_NTP(String S){
             //Serial.print("Server NTP Principal Falhou!" );
             return false;            
           }else{
-            //Serial.println("Obtido dados do Server Principal NTP com Sucesso!");
+            conexao_web_ntp = true;
             ntp_P.forceUpdate();
             hora = ntp_P.getFormattedTime();/* Armazena na variável hora, o horário atual. */
             
@@ -193,7 +242,7 @@ bool conexao_NTP(String S){
             //_server_ativo = "Falha! dados não obtidos! Servidores NTP offline";
             return false;            
           }else{
-            //Serial.println("Obtido dados do Server Principal NTP com Sucesso!");
+            conexao_web_ntp = true;
             ntp_B.forceUpdate();
             hora = ntp_B.getFormattedTime();/* Armazena na variável hora, o horário atual. |||ntp_B.getEpochTime();|||*/
 
@@ -211,7 +260,7 @@ bool conexao_NTP(String S){
                                     //Serial.print("Server NTP Principal Falhou!" );
                                     return false;            
                                   }else{
-                                    //Serial.println("Obtido dados do Server Principal NTP com Sucesso!");
+                                    conexao_web_ntp = true;
                                     ntp_P2.forceUpdate();
                                     hora = ntp_P2.getFormattedTime();/* Armazena na variável hora, o horário atual. */
                                     
@@ -219,7 +268,7 @@ bool conexao_NTP(String S){
                                       tv.tv_sec = ntp_P2.getEpochTime();     //Atribui minha data atual. Voce pode usar o NTP para isso ou o site citado no artigo! // 12:00 08/08/1982
                                       settimeofday(&tv, NULL);   //Configura o RTC para manter a data atribuida atualizada.
                                                  
-                                    _server_ativo = S;
+                                    _server_ativo = _serverP2;
                                     return true;          
                                   }
            }           
@@ -241,6 +290,7 @@ void verifica_atualiza_NTP(){
              if (conexao_NTP("_serverP2")) {  
                 Serial.println("Obtido dados do Server NTP BACKUP 2 |"+String(_server_ativo)+"| com Sucesso!");
              }else{
+                Serial.println("Server NTP BACKUP  |"+String(_serverP2)+"| Falhou!" );
                 Serial.println("Sem hora atualizada no momento! nova tentativa em instantes..." ); 
                 if( _server_ativo == "erro Desconhecido nos Servidores NTP!"){
                   _server_ativo = "Falha! dados não obtidos! Servidores NTP offline";
