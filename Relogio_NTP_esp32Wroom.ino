@@ -1,8 +1,8 @@
 /* Projeto Relogio_NTP – ESP32Wroom: Protocolo NTP */
 
 #include <NTPClient.h> /* https://github.com/arduino-libraries/NTPClient */
-#include <WiFi.h> /* Biblioteca do WiFi. */
-#include <time.h> /* Biblioteca do Relogio interno. */
+#include <WiFi.h>      /* Biblioteca do WiFi. */
+#include <time.h>      /* Biblioteca do Relogio interno. */
 
 /*-------- Configurações de Wi-fi----------- */
 const char* WIFI_ssid = "elitec_testes"; /* Substitua pelo nome da rede */
@@ -58,11 +58,9 @@ void setup()
   
   ////POR HORA NO COD TENTA UMA CONEXÃO WIFI POR INSTANTES!///////////////////////////////////////////
   tentativa_conectar_WIFI();
-  ////-fim-POR HORA NO COD TENTA UMA CONEXÃO WIFI POR INSTANTES!///////////////////////////////////////////   
-
-  
-      
+  ////-fim-POR HORA NO COD TENTA UMA CONEXÃO WIFI POR INSTANTES!///////////////////////////////////////////        
 }
+
                 void temos_conexao(char* _ntp_){
                     if (_ntp_ == "ntp_P"){
                       ntp_P.begin(); 
@@ -203,13 +201,13 @@ void Tempos_de_sincronismo_NTP(){
   if ( WiFi.status() != WL_CONNECTED ) {
        tentativa_conectar_WIFI();        
   }else{
-    if ((_time_stamp - (_timestamp_S_NTP.toInt ()) <= -60 )||(_time_stamp - (_timestamp_S_NTP.toInt ()) >= 60 )){
-      if (_assincronia_NTP == true){
-          Serial.println("Sincronizando com servidor NTP...");        
-          delay(100);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
-          verifica_atualiza_NTP();
-          _assincronia_NTP = false;
-      }               
+     if ((_time_stamp - (_timestamp_S_NTP.toInt ()) <= -60 )||(_time_stamp - (_timestamp_S_NTP.toInt ()) >= 60 )){
+                if (_assincronia_NTP == true){
+                    Serial.println("Sincronizando com servidor NTP...");        
+                    delay(100);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
+                    verifica_atualiza_NTP();
+                    _assincronia_NTP = false;
+                }               
     }else{
       //                                   
     } 
