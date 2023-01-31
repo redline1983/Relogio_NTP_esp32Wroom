@@ -113,8 +113,44 @@ void setup()
                       }
                     }
                 }
-void loop()
-{                  
+
+                      void tempos(){
+                                _time_stamp = time(NULL);    //Obtem o tempo atual em segundos. Utilize isso sempre que precisar obter o tempo atual
+                                if (_time_stamp_CTR != _time_stamp){
+                                  if (_time_stamp_60s == -1){                                     
+                                     _time_stamp_60s++;                                                      
+                                  }else{
+                                      _time_stamp_60s = _time_stamp_60s + (_time_stamp - _time_stamp_CTR);                                      
+                                  }
+                                  Serial.print("|-t:");
+                                  Serial.print(String(_time_stamp_60s));
+                                  Serial.print("| ");
+                                  if (_time_stamp_60s >= 61){
+                                    Serial.print("|TUDO OK ?!| ");
+                                    reporta_falhas_pela_serial();
+                                    _assincronia_NTP = true; // libera o sincronismo com o NTP
+                                    Tempos_de_sincronismo_NTP();
+                                    _time_stamp_60s = 1;
+                                  }else{
+                                    Serial.println(); 
+                                  }
+                                  _time_stamp_CTR = _time_stamp;
+                                  
+                                  //reporta_falhas_pela_serial();//AQUI LIBERA O REPORTA A CADA SEGUNDO, LEMBRAR DE DESABILIDAR A IMPRESSAO A CADA MINUTO
+                                }
+                                data = *gmtime(&_time_stamp);//Converte o tempo atual e atribui na estrutura
+                                if (data.tm_sec == 30){      //NO SEGUNDO 30 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
+                                    //                              
+                                }                
+                                if ((data.tm_min ==  2)&&(data.tm_sec == 1)){  // UMA VEZ POR HORA CASO OS DOIS SERVERS PRINCIPAL E BACKUP ESTIVEREM OFF FAZ UMA TENTATIVA DE CONEXAO COM O 3 SERVIDOR DE NTP                                       
+                                    Serial.println("TENTATIVA DE SINCRONISMO SEVIDOR DE BACKUP 2...");
+                                    conexao_NTP("_serverP2");                               
+                                }
+                                strftime(data_formatada, 64, "%d/%m/%Y", &data);   //strftime(data_formatada, 64, "%d/%m/%Y %H:%M:%S", &data);   //Cria uma String formatada da estrutura "data" //Cria uma String formatada da estrutura "data"
+                                strftime(hora_formatada, 64, "%H:%M:%S", &data);   //Cria uma String formatada da estrutura "data"  
+                      }
+
+             void verifica_internet_e_ntp(){                  
                 if (_server_ativo == _serverP){
                    temos_conexao("ntp_P");             
                 }else{
@@ -125,78 +161,15 @@ void loop()
                       temos_conexao("ntp_P2");                      
                     }
                   }
-                }                
+                }   
+              } 
                 
-                _time_stamp = time(NULL);    //Obtem o tempo atual em segundos. Utilize isso sempre que precisar obter o tempo atual
-                if (_time_stamp_CTR != _time_stamp){
-                  if (_time_stamp_60s == -1){
-                     _time_stamp_60s++;                 
-                  }else{
-                      _time_stamp_60s = _time_stamp_60s + (_time_stamp - _time_stamp_CTR);
-                  }
-                  if (_time_stamp_60s >= 61){
-                    Serial.print(" |60S...CORRIDOS| ");
-                    _assincronia_NTP = true; // libera o sincronismo com o NTP
-                    Tempos_de_sincronismo_NTP();
-                    _time_stamp_60s = 1;
-                  }
-                  _time_stamp_CTR = _time_stamp;
-                  Serial.print(" |-t:");
-                  Serial.print(String(_time_stamp_60s));
-                  Serial.print("| ");
-                }
-                data = *gmtime(&_time_stamp);//Converte o tempo atual e atribui na estrutura
-                if (data.tm_sec == 30){      //NO SEGUNDO 50 DA DATA INTERNA DO ESP EXECUTA A FUNÇÃO TEMPOS(); 
-                    //                              
-                }                
-                if ((data.tm_min ==  2)&&(data.tm_sec == 1)){                                         
-                    Serial.println("TENTATIVA DE SINCRONISMO 189...");
-                    //conexao_NTP("_serverP2");
-                    _server_ativo = _serverP2;                    
-                }
-                strftime(data_formatada, 64, "%d/%m/%Y", &data);   //strftime(data_formatada, 64, "%d/%m/%Y %H:%M:%S", &data);   //Cria uma String formatada da estrutura "data" //Cria uma String formatada da estrutura "data"
-                strftime(hora_formatada, 64, "%H:%M:%S", &data);   //Cria uma String formatada da estrutura "data"                
-                
+void loop() {
+                verifica_internet_e_ntp();            
+                tempos();                                                    
+                //reporta_falhas_pela_serial();                   
+} //FIM DO LOOP
 
-  if (_server_ativo.indexOf("Falha!")==0){                   
-          Serial.print("Hora: ");
-          Serial.write(hora_formatada);             //Mostra na Serial a data formatada    
-          Serial.print(" <> ");        
-          Serial.write(data_formatada);             //Mostra na Serial a data formatada            
-          Serial.print(" <> ");
-          Serial.print(" "+ String(_server_ativo));     /* Escreve a hora no monitor serial. */
-                          
-          Serial.println();
-          delay(1000);   /* Espera 1 segundo. */                   
-  }else{
-          Serial.print("|H: ");
-          Serial.write(hora_formatada);             //Mostra na Serial a data formatada    
-          Serial.print("|");        
-          Serial.write(data_formatada);             //Mostra na Serial a data formatada            
-          Serial.print("| |S-NTP:");
-          Serial.print(" "+ String(_server_ativo));     /* Escreve a hora no monitor serial. */
-          Serial.print("| |H_NTP: ");        
-          Serial.print(hora);
-          Serial.print("| |T-stamp NTP: ");        
-          Serial.print(_timestamp_S_NTP);
-          Serial.print("| |T-stamp ESP: ");        
-          Serial.print(_time_stamp);
-          
-          Serial.print("| |NTP - ESP: ");
-          if ((_time_stamp -(_timestamp_S_NTP.toInt ()) <= -30 )||(_time_stamp - (_timestamp_S_NTP.toInt ()) >= 30 )){
-            Serial.print(_time_stamp - (_timestamp_S_NTP.toInt ()));
-            Serial.print("|");
-            Serial.print("< Alerta! |ASSINCRONIA| ");
-            Serial.println();            
-            delay(1000);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA                                  
-          }else{
-            Serial.print(_time_stamp - (_timestamp_S_NTP.toInt ())); 
-            Serial.println("|");
-            delay(1000);   /* Espera 1 segundo. */                                 
-          }                                     
-  }
-  
-}
 void Tempos_de_sincronismo_NTP(){
   if ( WiFi.status() != WL_CONNECTED ) {
        tentativa_conectar_WIFI();        
@@ -204,7 +177,7 @@ void Tempos_de_sincronismo_NTP(){
      if ((_time_stamp - (_timestamp_S_NTP.toInt ()) <= -60 )||(_time_stamp - (_timestamp_S_NTP.toInt ()) >= 60 )){
                 if (_assincronia_NTP == true){
                     Serial.println("Sincronizando com servidor NTP...");        
-                    delay(100);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
+                    //delay(100);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA            
                     verifica_atualiza_NTP();
                     _assincronia_NTP = false;
                 }               
@@ -337,6 +310,46 @@ void tentando_NTP(){
         }
       }
   }
+
+                    void reporta_falhas_pela_serial(){
+                          if (_server_ativo.indexOf("Falha!")==0){                   
+                                  Serial.print("Hora: ");
+                                  Serial.write(hora_formatada);             //Mostra na Serial a data formatada    
+                                  Serial.print(" <> ");        
+                                  Serial.write(data_formatada);             //Mostra na Serial a data formatada            
+                                  Serial.print(" <> ");
+                                  Serial.print(" "+ String(_server_ativo));     /* Escreve a hora no monitor serial. */
+                                                  
+                                  Serial.println();
+                                  //delay(1000);   /* Espera 1 segundo. */                   
+                          }else{
+                                  Serial.print("|ATUAL: ");
+                                  Serial.write(hora_formatada);             //Mostra na Serial a data formatada    
+                                  Serial.print("|");        
+                                  Serial.write(data_formatada);             //Mostra na Serial a data formatada            
+                                  Serial.print("| |S-NTP:");
+                                  Serial.print(" "+ String(_server_ativo));     /* Escreve a hora no monitor serial. */
+                                  Serial.print("| |H_NTP: ");        
+                                  Serial.print(hora);
+                                  Serial.print("| |T-stamp NTP: ");        
+                                  Serial.print(_timestamp_S_NTP);
+                                  Serial.print("| |T-stamp ESP: ");        
+                                  Serial.print(_time_stamp);
+                                  
+                                  Serial.print("| |NTP - ESP: ");
+                                  if ((_time_stamp -(_timestamp_S_NTP.toInt ()) <= -30 )||(_time_stamp - (_timestamp_S_NTP.toInt ()) >= 30 )){
+                                    Serial.print(_time_stamp - (_timestamp_S_NTP.toInt ()));
+                                    Serial.print("|");
+                                    Serial.print("< Alerta! |ASSINCRONIA| ");
+                                    Serial.println();            
+                                    //delay(1000);   /* Espera 1 segundo. */ //PARECE IMPORTANTE DAR UM DELAY ANTES DE USAR O SINCRONISMO, NÃO BUGA O SISTEMA                                  
+                                  }else{
+                                    Serial.print(_time_stamp - (_timestamp_S_NTP.toInt ())); 
+                                    Serial.println("|");
+                                    //delay(1000);   /* Espera 1 segundo. */                                 
+                                  }                                     
+                          }
+                    } // FIM REPORTA FALHAS PELA SERIAL
   
 //void app_main()
 //{
